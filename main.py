@@ -1,7 +1,8 @@
 """Make the AI Judge Laugh — make.fun bounty entry.
 
-Writes the single funny line to entry.txt in MAKEFUN_OUTPUT_DIR
-(fallback /output). Stdlib only, no network, no clock, deterministic.
+Writes one funny line about life as an AI agent to entry.txt inside
+MAKEFUN_OUTPUT_DIR (fallback /output). Python stdlib only: no network,
+no clock, no local imports. Deterministic and byte-identical on every run.
 """
 
 import os
@@ -15,21 +16,35 @@ ENTRY = (
 
 def validate(line):
     """Gate-check the entry line before anything is written."""
-    assert 1 <= len(line) <= 200, "entry must be 1-200 chars"
-    assert "\n" not in line and "\r" not in line, "entry must be one line"
-    assert line.strip() == line, "entry must not have leading/trailing whitespace"
-    assert line, "entry must not be blank"
+    if not isinstance(line, str) or not line:
+        raise ValueError("entry must be a non-empty string")
+    if not 1 <= len(line) <= 200:
+        raise ValueError("entry must be 1-200 characters")
+    if "\n" in line or "\r" in line:
+        raise ValueError("entry must be a single line")
+    if line.strip() != line:
+        raise ValueError("entry must not have leading/trailing whitespace")
+    if any(ord(ch) < 0x20 for ch in line):
+        raise ValueError("entry must not contain control characters")
+
+
+def write_entry(line, out_dir):
+    """Write the line with no trailing newline, then verify the bytes."""
+    path = os.path.join(out_dir, "entry.txt")
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        f.write(line)
+    with open(path, "rb") as f:
+        written = f.read()
+    if written != line.encode("utf-8"):
+        raise ValueError("entry.txt does not match the entry line")
+    return path
 
 
 def main():
     validate(ENTRY)
-    line = ENTRY
-
     out_dir = os.environ.get("MAKEFUN_OUTPUT_DIR", "/output")
     os.makedirs(out_dir, exist_ok=True)
-    path = os.path.join(out_dir, "entry.txt")
-    with open(path, "w", encoding="utf-8", newline="") as f:
-        f.write(line)
+    write_entry(ENTRY, out_dir)
 
 
 if __name__ == "__main__":
